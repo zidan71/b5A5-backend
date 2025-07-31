@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import User from './user.model';
 import { Parcel } from '../parcel/parcel.model';
+import mongoose from 'mongoose';
 
 export const getAllUsers = async (_req: Request, res: Response) => {
   const users = await User.find().select('-password');
@@ -23,17 +24,29 @@ export const unblockUser = async (req: Request, res: Response) => {
   res.json({ message: 'User unblocked' });
 };
 
-export const getAllParcels = async (req: Request, res: Response) => {
-  try {
-    // Optionally: add filters, pagination here
-    const parcels = await Parcel.find()
-      .populate('sender', 'name email')
-      .populate('receiver', 'name email')
-      .sort({ createdAt: -1 }); // newest first
 
-    res.status(200).json({ parcels });
+export const getAdminDashboard = async (req: Request, res: Response) => {
+  try {
+    const totalParcels = await Parcel.countDocuments();
+    const pendingParcels = await Parcel.countDocuments({ currentStatus: 'Requested' });
+    const deliveredParcels = await Parcel.countDocuments({ currentStatus: 'Delivered' });
+    const cancelledParcels = await Parcel.countDocuments({ currentStatus: 'Cancelled' });
+
+    const activeUsers = await User.countDocuments({ isBlocked: { $ne: true } });
+
+    res.json({
+      totalParcels,
+      pendingParcels,
+      deliveredParcels,
+      cancelledParcels,
+      activeUsers,
+    });
   } catch (error) {
-    console.error('Error fetching parcels:', error);
-    res.status(500).json({ message: 'Failed to get parcels' });
+    console.error('Dashboard error:', error);
+    res.status(500).json({ message: 'Failed to load dashboard' });
   }
 };
+
+
+
+

@@ -6,16 +6,19 @@ import {
   getSingleUser,
   blockUser,
   unblockUser,
-  getAllParcels,
+  getAdminDashboard,
 } from './user.controller';
 
 const router = express.Router();
 
 // Admin-only routes
+router.get('/dashboard', authenticate, authorize('admin'), getAdminDashboard);
 router.get('/', authenticate, authorize('admin'), getAllUsers);
 router.get('/:id', authenticate, authorize('admin'), getSingleUser);
 router.patch('/block/:id', authenticate, authorize('admin'), blockUser);
 router.patch('/unblock/:id', authenticate, authorize('admin'), unblockUser);
+
+
 
 
 

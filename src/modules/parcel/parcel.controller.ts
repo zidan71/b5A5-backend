@@ -1,6 +1,6 @@
 import {Parcel} from './parcel.model';
 import { Request, Response } from 'express';
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 
 export const createParcel = async (req: any, res: Response) => {
   const { receiver, type, weight, deliveryAddress } = req.body;
@@ -40,7 +40,12 @@ interface CancelParcelParams {
   id: string;
 }
 
-interface AuthenticatedRequest extends Request<CancelParcelParams> {
+export interface AuthenticatedRequest<
+  P = {}, // Params type
+  ResBody = any,
+  ReqBody = any,
+  ReqQuery = any
+> extends Request<P, ResBody, ReqBody, ReqQuery> {
   user?: {
     _id: string;
     role: string;
@@ -48,7 +53,12 @@ interface AuthenticatedRequest extends Request<CancelParcelParams> {
 }
 
 
-export const cancelParcel = async (req: AuthenticatedRequest, res: Response) => {
+
+interface AuthenticatedRequestWithId extends Request<{ id: string }> {
+  user?: { _id: string; role: string };
+}
+
+export const cancelParcel = async (req: AuthenticatedRequestWithId, res: Response) => {
   try {
     const parcelId = req.params.id;
     const userId = req.user?._id;
@@ -63,21 +73,14 @@ export const cancelParcel = async (req: AuthenticatedRequest, res: Response) => 
       return res.status(404).json({ message: 'Parcel not found.' });
     }
 
-    console.log('Parcel sender:', parcel.sender.toString());
-console.log('Logged-in user:', userId?.toString());
-
-
-    // Only sender can cancel their own parcel
     if (parcel.sender.toString() !== userId?.toString()) {
       return res.status(403).json({ message: 'You are not allowed to cancel this parcel.' });
     }
 
-    // Only allow cancel if currentStatus is 'Requested'
     if (parcel.currentStatus !== 'Requested') {
       return res.status(400).json({ message: 'Parcel cannot be cancelled at this stage.' });
     }
 
-    // Update parcel status
     parcel.currentStatus = 'Cancelled';
     parcel.canceled = true;
 
@@ -94,14 +97,19 @@ console.log('Logged-in user:', userId?.toString());
       message: 'Parcel cancelled successfully.',
       parcel,
     });
-
   } catch (err) {
     console.error('Error cancelling parcel:', err);
     return res.status(500).json({ message: 'Something went wrong.', error: err });
   }
 };
+interface ConfirmDeliveryParams {
+  id: string;
+}
 
-export const confirmDelivery = async (req: AuthenticatedRequest, res: Response) => {
+export const confirmDelivery = async (
+  req: AuthenticatedRequest<ConfirmDeliveryParams>, 
+  res: Response
+) => {
   try {
     const parcelId = req.params.id;
     const userId = req.user?._id;
@@ -110,41 +118,13 @@ export const confirmDelivery = async (req: AuthenticatedRequest, res: Response) 
       return res.status(400).json({ message: 'Invalid parcel ID.' });
     }
 
-    const parcel = await Parcel.findById(parcelId);
+    // ...rest of your logic
 
-    if (!parcel) {
-      return res.status(404).json({ message: 'Parcel not found.' });
-    }
-
-    // Only receiver can confirm delivery
-    if (parcel.receiver.toString() !== userId) {
-      return res.status(403).json({ message: 'You are not authorized to confirm delivery for this parcel.' });
-    }
-
-    // Only allow if parcel is Dispatched or In Transit
-    if (!['Dispatched', 'In Transit'].includes(parcel.currentStatus)) {
-      return res.status(400).json({ message: `Parcel cannot be confirmed delivered at this status: ${parcel.currentStatus}` });
-    }
-
-    // Update status to Delivered
-    parcel.currentStatus = 'Delivered';
-
-    parcel.statusLog.push({
-      status: 'Delivered',
-      updatedBy: userId,
-      timestamp: new Date(),
-      note: 'Confirmed delivery by receiver',
-    });
-
-    await parcel.save();
-
-    return res.status(200).json({ message: 'Delivery confirmed successfully.', parcel });
   } catch (error) {
     console.error('Error confirming delivery:', error);
     return res.status(500).json({ message: 'Something went wrong.' });
   }
 };
-
 
 
 export const getIncomingParcels = async (req: AuthenticatedRequest, res: Response) => {
@@ -175,20 +155,92 @@ export const getDeliveryHistory = async (req: AuthenticatedRequest, res: Respons
 
 
 
-export const updateParcelStatus = async (req: Request, res: Response) => {
+export const updateParcelStatus = async (
+  req: AuthenticatedRequest<{ id: string }>, 
+  res: Response
+) => {
   const { status, note } = req.body;
+  const parcelId = req.params.id;
 
-  const parcel = await Parcel.findById(req.params.id);
+  const parcel = await Parcel.findById(parcelId);
   if (!parcel) return res.status(404).json({ message: 'Parcel not found' });
 
-  parcel.status = status;
+  parcel.currentStatus = status;
   parcel.statusLog.push({
     status,
     note,
-    updatedBy: req.user?._id,
+    updatedBy: req.user?._id,  // Now TypeScript knows about req.user
     timestamp: new Date(),
   });
 
   await parcel.save();
   res.json({ message: 'Status updated', parcel });
+};
+
+
+export const getAllParcels = async (req: Request, res: Response) => {
+  try {
+    const { status, userId } = req.query;
+
+    const filter: any = {};
+
+    if (status) {
+      filter.currentStatus = status;
+    }
+
+    if (userId) {
+      // convert string to ObjectId if valid
+      if (mongoose.Types.ObjectId.isValid(userId as string)) {
+        filter.$or = [
+          { sender: userId },
+          { receiver: userId }
+        ];
+      } else {
+        return res.status(400).json({ message: 'Invalid userId' });
+      }
+    }
+
+    const parcels = await Parcel.find(filter)
+      .populate('sender', 'name email')
+      .populate('receiver', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({ parcels });
+  } catch (error) {
+    console.error('Error fetching parcels:', error);
+    res.status(500).json({ message: 'Failed to get parcels' });
+  }
+};
+
+
+
+export const trackParcelPublic = async (req: Request, res: Response) => {
+  try {
+    const { trackingId } = req.params;
+    const parcel = await Parcel.findOne({ trackingId }).select('trackingId currentStatus statusLog');
+
+    if (!parcel) {
+      return res.status(404).json({ message: 'Parcel not found' });
+    }
+
+    res.json(parcel);
+  } catch (error) {
+    console.error('Error in public tracking:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+export const calculateFee = (req: Request, res: Response) => {
+  const weight = parseFloat(req.query.weight as string);
+  const distance = parseFloat(req.query.distance as string) || 10; // default 10 km
+
+  if (isNaN(weight) || weight <= 0) {
+    return res.status(400).json({ message: 'Weight must be a positive number' });
+  }
+
+  const baseFee = 10;
+  const fee = baseFee + weight * 5 + distance * 2;
+
+  res.json({ estimatedFee: fee });
 };

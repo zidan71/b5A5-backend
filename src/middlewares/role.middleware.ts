@@ -1,10 +1,14 @@
-import { NextFunction } from "express";
+import { Request, Response, NextFunction } from 'express';
 
 export const authorize = (...roles: string[]) => {
-  return (req: any, res: Response, next: NextFunction) => {
-    if (!roles.includes(req.user.role)) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    // If your req.user is not typed on Request, cast to any
+    const userRole = (req as any).user?.role;
+
+    if (!userRole || !roles.includes(userRole)) {
       return res.status(403).json({ message: 'Forbidden' });
     }
+
     next();
   };
 };
