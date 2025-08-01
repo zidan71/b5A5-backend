@@ -66,7 +66,7 @@ const getMyParcels = (req, res) => __awaiter(void 0, void 0, void 0, function* (
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         const parcels = yield parcel_model_1.Parcel.find({ sender: userId })
-            .populate('receiver', 'name email') // optional: show receiver info
+            .populate('receiver', 'name email')
             .sort({ createdAt: -1 });
         res.status(200).json({ message: 'Your parcels', parcels });
     }
@@ -121,11 +121,29 @@ const confirmDelivery = (req, res) => __awaiter(void 0, void 0, void 0, function
         if (!mongoose_1.Types.ObjectId.isValid(parcelId)) {
             return res.status(400).json({ message: 'Invalid parcel ID.' });
         }
-        // ...rest of your logic
+        const parcel = yield parcel_model_1.Parcel.findById(parcelId);
+        if (!parcel) {
+            return res.status(404).json({ message: 'Parcel not found.' });
+        }
+        if (parcel.receiver.toString() !== (userId === null || userId === void 0 ? void 0 : userId.toString())) {
+            return res.status(403).json({ message: 'You are not authorized to confirm delivery for this parcel.' });
+        }
+        if (!['Dispatched', 'In Transit'].includes(parcel.currentStatus)) {
+            return res.status(400).json({ message: `Parcel cannot be confirmed delivered at this status: ${parcel.currentStatus}` });
+        }
+        parcel.currentStatus = 'Delivered';
+        parcel.statusLog.push({
+            status: 'Delivered',
+            updatedBy: userId,
+            timestamp: new Date(),
+            note: 'Confirmed delivery by receiver',
+        });
+        yield parcel.save();
+        return res.status(200).json({ message: 'Delivery confirmed successfully.', parcel });
     }
     catch (error) {
         console.error('Error confirming delivery:', error);
-        return res.status(500).json({ message: 'Something went wrong.' });
+        return res.status(500).json({ message: 'Something went wrong.', error });
     }
 });
 exports.confirmDelivery = confirmDelivery;
@@ -167,7 +185,7 @@ const updateParcelStatus = (req, res) => __awaiter(void 0, void 0, void 0, funct
     parcel.statusLog.push({
         status,
         note,
-        updatedBy: (_a = req.user) === null || _a === void 0 ? void 0 : _a._id, // Now TypeScript knows about req.user
+        updatedBy: (_a = req.user) === null || _a === void 0 ? void 0 : _a._id,
         timestamp: new Date(),
     });
     yield parcel.save();
@@ -182,7 +200,6 @@ const getAllParcels = (req, res) => __awaiter(void 0, void 0, void 0, function* 
             filter.currentStatus = status;
         }
         if (userId) {
-            // convert string to ObjectId if valid
             if (mongoose_1.default.Types.ObjectId.isValid(userId)) {
                 filter.$or = [
                     { sender: userId },
@@ -222,7 +239,7 @@ const trackParcelPublic = (req, res) => __awaiter(void 0, void 0, void 0, functi
 exports.trackParcelPublic = trackParcelPublic;
 const calculateFee = (req, res) => {
     const weight = parseFloat(req.query.weight);
-    const distance = parseFloat(req.query.distance) || 10; // default 10 km
+    const distance = parseFloat(req.query.distance) || 10;
     if (isNaN(weight) || weight <= 0) {
         return res.status(400).json({ message: 'Weight must be a positive number' });
     }

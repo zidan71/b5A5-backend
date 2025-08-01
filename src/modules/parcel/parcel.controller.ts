@@ -26,7 +26,7 @@ export const getMyParcels = async (req: Request, res: Response) => {
     const userId = (req as any).user?._id;
 
     const parcels = await Parcel.find({ sender: userId })
-      .populate('receiver', 'name email') // optional: show receiver info
+      .populate('receiver', 'name email')
       .sort({ createdAt: -1 });
 
     res.status(200).json({ message: 'Your parcels', parcels });
@@ -36,9 +36,7 @@ export const getMyParcels = async (req: Request, res: Response) => {
 };
 
 
-interface CancelParcelParams {
-  id: string;
-}
+
 
 export interface AuthenticatedRequest<
   P = {}, // Params type
@@ -107,7 +105,7 @@ interface ConfirmDeliveryParams {
 }
 
 export const confirmDelivery = async (
-  req: AuthenticatedRequest<ConfirmDeliveryParams>, 
+  req: AuthenticatedRequest<ConfirmDeliveryParams>,
   res: Response
 ) => {
   try {
@@ -118,11 +116,36 @@ export const confirmDelivery = async (
       return res.status(400).json({ message: 'Invalid parcel ID.' });
     }
 
-    // ...rest of your logic
+    const parcel = await Parcel.findById(parcelId);
+
+    if (!parcel) {
+      return res.status(404).json({ message: 'Parcel not found.' });
+    }
+
+    if (parcel.receiver.toString() !== userId?.toString()) {
+      return res.status(403).json({ message: 'You are not authorized to confirm delivery for this parcel.' });
+    }
+
+    if (!['Dispatched', 'In Transit'].includes(parcel.currentStatus)) {
+      return res.status(400).json({ message: `Parcel cannot be confirmed delivered at this status: ${parcel.currentStatus}` });
+    }
+
+    parcel.currentStatus = 'Delivered';
+
+    parcel.statusLog.push({
+      status: 'Delivered',
+      updatedBy: userId,
+      timestamp: new Date(),
+      note: 'Confirmed delivery by receiver',
+    });
+
+    await parcel.save();
+
+    return res.status(200).json({ message: 'Delivery confirmed successfully.', parcel });
 
   } catch (error) {
     console.error('Error confirming delivery:', error);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    return res.status(500).json({ message: 'Something went wrong.', error });
   }
 };
 
@@ -169,7 +192,7 @@ export const updateParcelStatus = async (
   parcel.statusLog.push({
     status,
     note,
-    updatedBy: req.user?._id,  // Now TypeScript knows about req.user
+    updatedBy: req.user?._id,
     timestamp: new Date(),
   });
 
@@ -189,7 +212,6 @@ export const getAllParcels = async (req: Request, res: Response) => {
     }
 
     if (userId) {
-      // convert string to ObjectId if valid
       if (mongoose.Types.ObjectId.isValid(userId as string)) {
         filter.$or = [
           { sender: userId },
@@ -233,7 +255,7 @@ export const trackParcelPublic = async (req: Request, res: Response) => {
 
 export const calculateFee = (req: Request, res: Response) => {
   const weight = parseFloat(req.query.weight as string);
-  const distance = parseFloat(req.query.distance as string) || 10; // default 10 km
+  const distance = parseFloat(req.query.distance as string) || 10; 
 
   if (isNaN(weight) || weight <= 0) {
     return res.status(400).json({ message: 'Weight must be a positive number' });

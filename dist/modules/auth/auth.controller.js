@@ -26,7 +26,6 @@ exports.register = register;
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { email, password } = req.body;
     const user = yield user_model_1.default.findOne({ email });
-    // Check if user exists and user.password is a string
     if (!user || !user.password) {
         return res.status(401).json({ message: 'Invalid credentials' });
     }

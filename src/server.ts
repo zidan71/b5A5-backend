@@ -6,6 +6,11 @@ dotenv.config();
 
 const port = 5000;
 
+
+app.get('/',(req,res) => {
+    res.send("Welcome to parcel Delivery api")
+})
+
 mongoose.connect(`mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ytuhl.mongodb.net/parcel-backend?retryWrites=true&w=majority&appName=Cluster0`)
   .then(() => {
     console.log('✅ DB connected');

@@ -14,7 +14,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authenticate = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const user_model_1 = __importDefault(require("../modules/user/user.model")); // Make sure the path is correct
+const user_model_1 = __importDefault(require("../modules/user/user.model"));
 const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -23,15 +23,13 @@ const authenticate = (req, res, next) => __awaiter(void 0, void 0, void 0, funct
     const token = authHeader.split(' ')[1];
     try {
         const decoded = jsonwebtoken_1.default.verify(token, process.env.JWT_SECRET);
-        // 🔎 Fetch full user to check isBlocked
         const user = yield user_model_1.default.findById(decoded._id);
         if (!user)
             return res.status(401).json({ message: 'User not found' });
-        // ❌ Blocked user check
         if (user.isBlocked) {
             return res.status(403).json({ message: 'Forbidden: User is blocked' });
         }
-        req.user = user; // Set full user (optional: pick only _id and role if needed)
+        req.user = user;
         next();
     }
     catch (err) {

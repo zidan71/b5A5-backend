@@ -28,7 +28,7 @@ const parcelSchema = new mongoose.Schema({
     enum: ['Requested', 'Approved', 'Dispatched', 'In Transit', 'Delivered', 'Cancelled'],
     default: 'Requested',
   },
-  statusLog: [statusLogSchema], // ✅ renamed from statusLogs → statusLog
+  statusLog: [statusLogSchema], 
   blocked: { type: Boolean, default: false },
   canceled: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
