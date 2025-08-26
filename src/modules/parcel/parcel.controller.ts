@@ -24,22 +24,34 @@ export const createParcel = async (req: any, res: Response) => {
 export const getMyParcels = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user?._id;
+    const role = (req as any).user?.role;
 
-    const parcels = await Parcel.find({ sender: userId })
-      .populate('receiver', 'name email')
-      .sort({ createdAt: -1 });
+    let parcels;
 
-    res.status(200).json({ message: 'Your parcels', parcels });
+    if (role === "sender") {
+      parcels = await Parcel.find({ sender: userId })
+        .populate("receiver", "name email")
+        .sort({ createdAt: -1 });
+    } else if (role === "receiver") {
+      parcels = await Parcel.find({ receiver: userId })
+        .populate("sender", "name email")
+        .sort({ createdAt: -1 });
+    } else {
+      return res.status(403).json({ message: "Invalid role" });
+    }
+
+    res.status(200).json({ message: "Your parcels", parcels });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch parcels', error });
+    res.status(500).json({ message: "Failed to fetch parcels", error });
   }
 };
 
 
 
 
+
 export interface AuthenticatedRequest<
-  P = {}, // Params type
+  P = {}, 
   ResBody = any,
   ReqBody = any,
   ReqQuery = any
@@ -153,12 +165,20 @@ export const confirmDelivery = async (
 export const getIncomingParcels = async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.user?._id;
-    const parcels = await Parcel.find({ receiver: userId });
-    res.status(200).json({ parcels });
+
+    const parcels = await Parcel.find({
+      receiver: userId,
+      currentStatus: { $ne: 'Delivered' }, // 👈 exclude Delivered
+    })
+      .populate('sender', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(parcels);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch incoming parcels', error: err });
   }
 };
+
 
 
 export const getDeliveryHistory = async (req: AuthenticatedRequest, res: Response) => {
@@ -201,45 +221,76 @@ export const updateParcelStatus = async (
 };
 
 
+
+
 export const getAllParcels = async (req: Request, res: Response) => {
   try {
-    const { status, userId } = req.query;
+    const { status, userId, search = "", page = "1", limit = "10" } = req.query;
 
     const filter: any = {};
 
+    // Status filter
     if (status) {
       filter.currentStatus = status;
     }
 
+    // User filter
     if (userId) {
       if (mongoose.Types.ObjectId.isValid(userId as string)) {
-        filter.$or = [
-          { sender: userId },
-          { receiver: userId }
-        ];
+        filter.$or = [{ sender: userId }, { receiver: userId }];
       } else {
-        return res.status(400).json({ message: 'Invalid userId' });
+        return res.status(400).json({ message: "Invalid userId" });
       }
     }
 
-    const parcels = await Parcel.find(filter)
-      .populate('sender', 'name email')
-      .populate('receiver', 'name email')
-      .sort({ createdAt: -1 });
+    // Search filter
+    if (search) {
+      filter.$or = [
+        { trackingId: { $regex: search, $options: "i" } },
+        { "sender.name": { $regex: search, $options: "i" } },
+        { "sender.email": { $regex: search, $options: "i" } },
+        { "receiver.name": { $regex: search, $options: "i" } },
+        { "receiver.email": { $regex: search, $options: "i" } },
+      ];
+    }
 
-    res.status(200).json({ parcels });
+    // Pagination setup
+    const pageNum = parseInt(page as string, 10) || 1;
+    const limitNum = parseInt(limit as string, 10) || 10;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Query with population
+    const parcels = await Parcel.find(filter)
+      .populate("sender", "name email")
+      .populate("receiver", "name email")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum);
+
+    const total = await Parcel.countDocuments(filter);
+
+    res.status(200).json({
+      parcels,
+      total,
+      page: pageNum,
+      pages: Math.ceil(total / limitNum),
+    });
   } catch (error) {
-    console.error('Error fetching parcels:', error);
-    res.status(500).json({ message: 'Failed to get parcels' });
+    console.error("Error fetching parcels:", error);
+    res.status(500).json({ message: "Failed to get parcels" });
   }
 };
+
 
 
 
 export const trackParcelPublic = async (req: Request, res: Response) => {
   try {
     const { trackingId } = req.params;
-    const parcel = await Parcel.findOne({ trackingId }).select('trackingId currentStatus statusLog');
+
+    const parcel = await Parcel.findOne({ trackingId: new RegExp(`^${trackingId}$`, 'i') })
+      .populate('sender', 'name email')
+      .populate('receiver', 'name email');
 
     if (!parcel) {
       return res.status(404).json({ message: 'Parcel not found' });
@@ -251,6 +302,7 @@ export const trackParcelPublic = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 
 export const calculateFee = (req: Request, res: Response) => {

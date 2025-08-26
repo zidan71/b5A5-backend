@@ -9,7 +9,10 @@ import publicRoutes from './modules/parcel/public.routes'
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true,
+}));
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(cookieParser());
@@ -17,6 +20,6 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/parcels', parcelRoutes);
-app.use('/public', publicRoutes);
+app.use('/api/public', publicRoutes);
 
 export default app;

@@ -12,7 +12,7 @@ import {
 const router = express.Router();
 
 // Admin-only routes
-router.get('/dashboard', authenticate, authorize('admin'), getAdminDashboard);
+router.get('/dashboard', authenticate, getAdminDashboard);
 router.get('/', authenticate, authorize('admin'), getAllUsers);
 router.get('/:id', authenticate, authorize('admin'), getSingleUser);
 router.patch('/block/:id', authenticate, authorize('admin'), blockUser);
