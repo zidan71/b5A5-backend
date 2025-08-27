@@ -39,22 +39,74 @@ const unblockUser = (req, res) => __awaiter(void 0, void 0, void 0, function* ()
 exports.unblockUser = unblockUser;
 const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const totalParcels = yield parcel_model_1.Parcel.countDocuments();
-        const pendingParcels = yield parcel_model_1.Parcel.countDocuments({ currentStatus: 'Requested' });
-        const deliveredParcels = yield parcel_model_1.Parcel.countDocuments({ currentStatus: 'Delivered' });
-        const cancelledParcels = yield parcel_model_1.Parcel.countDocuments({ currentStatus: 'Cancelled' });
-        const activeUsers = yield user_model_1.default.countDocuments({ isBlocked: { $ne: true } });
-        res.json({
-            totalParcels,
-            pendingParcels,
-            deliveredParcels,
-            cancelledParcels,
-            activeUsers,
-        });
+        const role = req.user.role;
+        const userId = req.user._id;
+        const monthlyTrend = yield parcel_model_1.Parcel.aggregate([
+            {
+                $group: {
+                    _id: { year: { $year: "$createdAt" }, month: { $month: "$createdAt" } },
+                    count: { $sum: 1 },
+                },
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+        ]);
+        const statusDistribution = yield parcel_model_1.Parcel.aggregate([
+            {
+                $group: {
+                    _id: "$currentStatus",
+                    count: { $sum: 1 },
+                },
+            },
+        ]);
+        if (role === "admin") {
+            // Admin: global stats
+            const totalParcels = yield parcel_model_1.Parcel.countDocuments();
+            const pendingParcels = yield parcel_model_1.Parcel.countDocuments({ currentStatus: "Requested" });
+            const deliveredParcels = yield parcel_model_1.Parcel.countDocuments({ currentStatus: "Delivered" });
+            const cancelledParcels = yield parcel_model_1.Parcel.countDocuments({ currentStatus: "Cancelled" });
+            const activeUsers = yield user_model_1.default.countDocuments({ isBlocked: { $ne: true } });
+            res.json({
+                role,
+                totalParcels,
+                pendingParcels,
+                deliveredParcels,
+                cancelledParcels,
+                activeUsers,
+                statusDistribution,
+                monthlyTrend
+            });
+        }
+        else if (role === "sender") {
+            // Sender: stats only for parcels they sent
+            const totalParcels = yield parcel_model_1.Parcel.countDocuments({ sender: userId });
+            const deliveredParcels = yield parcel_model_1.Parcel.countDocuments({ sender: userId, currentStatus: "Delivered" });
+            const cancelledParcels = yield parcel_model_1.Parcel.countDocuments({ sender: userId, currentStatus: "Cancelled" });
+            res.json({
+                role,
+                totalParcels,
+                deliveredParcels,
+                cancelledParcels,
+            });
+        }
+        else if (role === "receiver") {
+            // Receiver: stats only for parcels they receive
+            const totalParcels = yield parcel_model_1.Parcel.countDocuments({ receiver: userId });
+            const deliveredParcels = yield parcel_model_1.Parcel.countDocuments({ receiver: userId, currentStatus: "Delivered" });
+            const pendingParcels = yield parcel_model_1.Parcel.countDocuments({ receiver: userId, currentStatus: "Requested" });
+            res.json({
+                role,
+                totalParcels,
+                deliveredParcels,
+                pendingParcels,
+            });
+        }
+        else {
+            return res.status(400).json({ message: "Invalid role" });
+        }
     }
     catch (error) {
-        console.error('Dashboard error:', error);
-        res.status(500).json({ message: 'Failed to load dashboard' });
+        console.error("Dashboard error:", error);
+        res.status(500).json({ message: "Failed to load dashboard", error });
     }
 });
 exports.getAdminDashboard = getAdminDashboard;

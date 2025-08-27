@@ -62,16 +62,28 @@ const createParcel = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 });
 exports.createParcel = createParcel;
 const getMyParcels = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
+    var _a, _b;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
-        const parcels = yield parcel_model_1.Parcel.find({ sender: userId })
-            .populate('receiver', 'name email')
-            .sort({ createdAt: -1 });
-        res.status(200).json({ message: 'Your parcels', parcels });
+        const role = (_b = req.user) === null || _b === void 0 ? void 0 : _b.role;
+        let parcels;
+        if (role === "sender") {
+            parcels = yield parcel_model_1.Parcel.find({ sender: userId })
+                .populate("receiver", "name email")
+                .sort({ createdAt: -1 });
+        }
+        else if (role === "receiver") {
+            parcels = yield parcel_model_1.Parcel.find({ receiver: userId })
+                .populate("sender", "name email")
+                .sort({ createdAt: -1 });
+        }
+        else {
+            return res.status(403).json({ message: "Invalid role" });
+        }
+        res.status(200).json({ message: "Your parcels", parcels });
     }
     catch (error) {
-        res.status(500).json({ message: 'Failed to fetch parcels', error });
+        res.status(500).json({ message: "Failed to fetch parcels", error });
     }
 });
 exports.getMyParcels = getMyParcels;
@@ -151,8 +163,13 @@ const getIncomingParcels = (req, res) => __awaiter(void 0, void 0, void 0, funct
     var _a;
     try {
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
-        const parcels = yield parcel_model_1.Parcel.find({ receiver: userId });
-        res.status(200).json({ parcels });
+        const parcels = yield parcel_model_1.Parcel.find({
+            receiver: userId,
+            currentStatus: { $ne: 'Delivered' }, // 👈 exclude Delivered
+        })
+            .populate('sender', 'name email')
+            .sort({ createdAt: -1 });
+        res.status(200).json(parcels);
     }
     catch (err) {
         res.status(500).json({ message: 'Failed to fetch incoming parcels', error: err });
@@ -194,38 +211,48 @@ const updateParcelStatus = (req, res) => __awaiter(void 0, void 0, void 0, funct
 exports.updateParcelStatus = updateParcelStatus;
 const getAllParcels = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { status, userId } = req.query;
+        const { status, userId, search = "", page = "1", limit = "10" } = req.query;
         const filter = {};
-        if (status) {
+        if (status)
             filter.currentStatus = status;
+        const orConditions = [];
+        if (userId && mongoose_1.default.Types.ObjectId.isValid(userId)) {
+            orConditions.push({ sender: userId }, { receiver: userId });
         }
-        if (userId) {
-            if (mongoose_1.default.Types.ObjectId.isValid(userId)) {
-                filter.$or = [
-                    { sender: userId },
-                    { receiver: userId }
-                ];
-            }
-            else {
-                return res.status(400).json({ message: 'Invalid userId' });
-            }
+        if (search) {
+            orConditions.push({ trackingId: { $regex: search, $options: "i" } }, { "sender.name": { $regex: search, $options: "i" } }, { "sender.email": { $regex: search, $options: "i" } }, { "receiver.name": { $regex: search, $options: "i" } }, { "receiver.email": { $regex: search, $options: "i" } });
         }
+        if (orConditions.length)
+            filter.$or = orConditions;
+        const pageNum = parseInt(page, 10) || 1;
+        const limitNum = parseInt(limit, 10) || 10;
+        const skip = (pageNum - 1) * limitNum;
         const parcels = yield parcel_model_1.Parcel.find(filter)
-            .populate('sender', 'name email')
-            .populate('receiver', 'name email')
-            .sort({ createdAt: -1 });
-        res.status(200).json({ parcels });
+            .populate("sender", "name email")
+            .populate("receiver", "name email")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limitNum);
+        const total = yield parcel_model_1.Parcel.countDocuments(filter);
+        res.status(200).json({
+            parcels,
+            total,
+            page: pageNum,
+            pages: Math.ceil(total / limitNum),
+        });
     }
     catch (error) {
-        console.error('Error fetching parcels:', error);
-        res.status(500).json({ message: 'Failed to get parcels' });
+        console.error("Error fetching parcels:", error);
+        res.status(500).json({ message: "Failed to get parcels" });
     }
 });
 exports.getAllParcels = getAllParcels;
 const trackParcelPublic = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { trackingId } = req.params;
-        const parcel = yield parcel_model_1.Parcel.findOne({ trackingId }).select('trackingId currentStatus statusLog');
+        const parcel = yield parcel_model_1.Parcel.findOne({ trackingId: new RegExp(`^${trackingId}$`, 'i') })
+            .populate('sender', 'name email')
+            .populate('receiver', 'name email');
         if (!parcel) {
             return res.status(404).json({ message: 'Parcel not found' });
         }

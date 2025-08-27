@@ -228,38 +228,27 @@ export const getAllParcels = async (req: Request, res: Response) => {
     const { status, userId, search = "", page = "1", limit = "10" } = req.query;
 
     const filter: any = {};
+    if (status) filter.currentStatus = status;
 
-    // Status filter
-    if (status) {
-      filter.currentStatus = status;
+    const orConditions: any[] = [];
+    if (userId && mongoose.Types.ObjectId.isValid(userId as string)) {
+      orConditions.push({ sender: userId }, { receiver: userId });
     }
-
-    // User filter
-    if (userId) {
-      if (mongoose.Types.ObjectId.isValid(userId as string)) {
-        filter.$or = [{ sender: userId }, { receiver: userId }];
-      } else {
-        return res.status(400).json({ message: "Invalid userId" });
-      }
-    }
-
-    // Search filter
     if (search) {
-      filter.$or = [
+      orConditions.push(
         { trackingId: { $regex: search, $options: "i" } },
         { "sender.name": { $regex: search, $options: "i" } },
         { "sender.email": { $regex: search, $options: "i" } },
         { "receiver.name": { $regex: search, $options: "i" } },
-        { "receiver.email": { $regex: search, $options: "i" } },
-      ];
+        { "receiver.email": { $regex: search, $options: "i" } }
+      );
     }
+    if (orConditions.length) filter.$or = orConditions;
 
-    // Pagination setup
     const pageNum = parseInt(page as string, 10) || 1;
     const limitNum = parseInt(limit as string, 10) || 10;
     const skip = (pageNum - 1) * limitNum;
 
-    // Query with population
     const parcels = await Parcel.find(filter)
       .populate("sender", "name email")
       .populate("receiver", "name email")
@@ -280,6 +269,7 @@ export const getAllParcels = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Failed to get parcels" });
   }
 };
+
 
 
 

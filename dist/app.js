@@ -12,12 +12,18 @@ const parcel_routes_1 = __importDefault(require("./modules/parcel/parcel.routes"
 const user_routes_1 = __importDefault(require("./modules/user/user.routes"));
 const public_routes_1 = __importDefault(require("./modules/parcel/public.routes"));
 const app = (0, express_1.default)();
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)({
+    origin: [
+        "https://your-project-namesssssdds.surge.sh",
+        "https://your-netlify-project.netlify.app"
+    ],
+    credentials: true,
+}));
 app.use((0, morgan_1.default)('dev'));
 app.use(express_1.default.json());
 app.use((0, cookie_parser_1.default)());
 app.use('/api/auth', auth_routes_1.default);
 app.use('/api/users', user_routes_1.default);
 app.use('/api/parcels', parcel_routes_1.default);
-app.use('/public', public_routes_1.default);
+app.use('/api/public', public_routes_1.default);
 exports.default = app;
