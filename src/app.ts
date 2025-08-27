@@ -10,14 +10,9 @@ import publicRoutes from './modules/parcel/public.routes'
 const app = express();
 
 app.use(cors({
-  origin: [
-    "http://localhost:5173",
-    "https://your-project-namesssssdds.surge.sh",
-    "https://your-netlify-project.netlify.app"
-  ],
+  origin: ["http://localhost:5173","https://l5a5zidan.surge.sh"],
   credentials: true,
 }));
-  
 app.use(morgan('dev'));
 app.use(express.json());
 app.use(cookieParser());
