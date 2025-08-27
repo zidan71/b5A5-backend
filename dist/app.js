@@ -13,7 +13,7 @@ const user_routes_1 = __importDefault(require("./modules/user/user.routes"));
 const public_routes_1 = __importDefault(require("./modules/parcel/public.routes"));
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)({
-    origin: ["http://localhost:5173", "https://l5a5zidan.surge.sh"],
+    origin: ["http://localhost:5173", "https://parcelfluxzidanassignment6.surge.sh"],
     credentials: true,
 }));
 app.use((0, morgan_1.default)('dev'));

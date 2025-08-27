@@ -165,7 +165,7 @@ const getIncomingParcels = (req, res) => __awaiter(void 0, void 0, void 0, funct
         const userId = (_a = req.user) === null || _a === void 0 ? void 0 : _a._id;
         const parcels = yield parcel_model_1.Parcel.find({
             receiver: userId,
-            currentStatus: { $ne: 'Delivered' }, // 👈 exclude Delivered
+            currentStatus: { $ne: 'Delivered' },
         })
             .populate('sender', 'name email')
             .sort({ createdAt: -1 });

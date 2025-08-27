@@ -59,7 +59,6 @@ const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functi
             },
         ]);
         if (role === "admin") {
-            // Admin: global stats
             const totalParcels = yield parcel_model_1.Parcel.countDocuments();
             const pendingParcels = yield parcel_model_1.Parcel.countDocuments({ currentStatus: "Requested" });
             const deliveredParcels = yield parcel_model_1.Parcel.countDocuments({ currentStatus: "Delivered" });
@@ -77,7 +76,6 @@ const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functi
             });
         }
         else if (role === "sender") {
-            // Sender: stats only for parcels they sent
             const totalParcels = yield parcel_model_1.Parcel.countDocuments({ sender: userId });
             const deliveredParcels = yield parcel_model_1.Parcel.countDocuments({ sender: userId, currentStatus: "Delivered" });
             const cancelledParcels = yield parcel_model_1.Parcel.countDocuments({ sender: userId, currentStatus: "Cancelled" });
@@ -89,7 +87,6 @@ const getAdminDashboard = (req, res) => __awaiter(void 0, void 0, void 0, functi
             });
         }
         else if (role === "receiver") {
-            // Receiver: stats only for parcels they receive
             const totalParcels = yield parcel_model_1.Parcel.countDocuments({ receiver: userId });
             const deliveredParcels = yield parcel_model_1.Parcel.countDocuments({ receiver: userId, currentStatus: "Delivered" });
             const pendingParcels = yield parcel_model_1.Parcel.countDocuments({ receiver: userId, currentStatus: "Requested" });

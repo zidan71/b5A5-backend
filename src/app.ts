@@ -10,7 +10,7 @@ import publicRoutes from './modules/parcel/public.routes'
 const app = express();
 
 app.use(cors({
-  origin: ["http://localhost:5173","https://l5a5zidan.surge.sh"],
+  origin: ["http://localhost:5173","https://parcelfluxzidanassignment6.surge.sh"],
   credentials: true,
 }));
 app.use(morgan('dev'));

@@ -16,21 +16,16 @@ exports.login = exports.register = void 0;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const user_model_1 = __importDefault(require("../user/user.model"));
-// ------------------- REGISTER -------------------
 const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { name, email, password, role } = req.body;
-        // Check if user exists
         const existing = yield user_model_1.default.findOne({ email });
         if (existing) {
             return res.status(400).json({ message: "Email already registered" });
         }
-        // Hash password
         const hashed = yield bcryptjs_1.default.hash(password, 10);
         const user = yield user_model_1.default.create({ name, email, password: hashed, role });
-        // Generate token
         const token = jsonwebtoken_1.default.sign({ _id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
-        // ✅ Send consistent clean response
         res.status(201).json({
             user: {
                 _id: user._id,
@@ -47,7 +42,6 @@ const register = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     }
 });
 exports.register = register;
-// ------------------- LOGIN -------------------
 const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = req.body;
@@ -59,9 +53,7 @@ const login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (!isMatch) {
             return res.status(401).json({ message: "Invalid credentials" });
         }
-        // Generate token
         const token = jsonwebtoken_1.default.sign({ _id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "7d" });
-        // ✅ Send consistent clean response
         res.json({
             user: {
                 _id: user._id,
