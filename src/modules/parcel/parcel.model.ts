@@ -14,7 +14,7 @@ const statusLogSchema = new mongoose.Schema({
 const parcelSchema = new mongoose.Schema({
   trackingId: {
     type: String,
-    required: true,
+    required: true, 
     unique: true,
   },
   sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
