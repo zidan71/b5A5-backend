@@ -168,7 +168,7 @@ export const getIncomingParcels = async (req: AuthenticatedRequest, res: Respons
 
     const parcels = await Parcel.find({
       receiver: userId,
-      currentStatus: { $ne: 'Delivered' }, // 👈 exclude Delivered
+      currentStatus: { $ne: 'Delivered' }, 
     })
       .populate('sender', 'name email')
       .sort({ createdAt: -1 });

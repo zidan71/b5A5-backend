@@ -51,7 +51,7 @@ const statusDistribution = await Parcel.aggregate([
 
 
     if (role === "admin") {
-      // Admin: global stats
+
       const totalParcels = await Parcel.countDocuments();
       const pendingParcels = await Parcel.countDocuments({ currentStatus: "Requested" });
       const deliveredParcels = await Parcel.countDocuments({ currentStatus: "Delivered" });
@@ -69,7 +69,7 @@ const statusDistribution = await Parcel.aggregate([
         monthlyTrend
       });
     } else if (role === "sender") {
-      // Sender: stats only for parcels they sent
+
       const totalParcels = await Parcel.countDocuments({ sender: userId });
       const deliveredParcels = await Parcel.countDocuments({ sender: userId, currentStatus: "Delivered" });
       const cancelledParcels = await Parcel.countDocuments({ sender: userId, currentStatus: "Cancelled" });
@@ -81,7 +81,7 @@ const statusDistribution = await Parcel.aggregate([
         cancelledParcels,
       });
     } else if (role === "receiver") {
-      // Receiver: stats only for parcels they receive
+      
       const totalParcels = await Parcel.countDocuments({ receiver: userId });
       const deliveredParcels = await Parcel.countDocuments({ receiver: userId, currentStatus: "Delivered" });
       const pendingParcels = await Parcel.countDocuments({ receiver: userId, currentStatus: "Requested" });
